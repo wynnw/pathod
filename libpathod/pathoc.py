@@ -1,9 +1,12 @@
 import sys, os
+from collections import namedtuple
 from netlib import tcp, http
 import netlib.utils
 import language, utils
 
+
 class PathocError(Exception): pass
+PathocResult = namedtuple('PathocResult', 'httpversion code msg headers content')
 
 
 class Pathoc(tcp.TCPClient):
@@ -41,7 +44,7 @@ class Pathoc(tcp.TCPClient):
 
     def pipelined_requests(self, specs):
         """
-            Return a list of (httpversion, code, msg, headers, content) tuples.
+            Return a list of PathocResult namedtuple's.
             The requests defined by the list of spec are sent using http pipelining.
 
             May raise language.ParseException, netlib.http.HttpError or
@@ -56,12 +59,13 @@ class Pathoc(tcp.TCPClient):
         rval = []
         for spec in specs:
             r, ret = parsed_specs[spec]
-            rval.append(http.read_response(self.rfile, r.method, None))
+            result = PathocResult._make(http.read_response(self.rfile, r.method, None))
+            rval.append(result)
         return rval
 
     def request(self, spec):
         """
-            Return an (httpversion, code, msg, headers, content) tuple.
+            Return a PathocResult namedtuple.
 
             May raise language.ParseException, netlib.http.HttpError or
             language.FileAccessDenied.
@@ -69,10 +73,10 @@ class Pathoc(tcp.TCPClient):
         r = language.parse_request(self.settings, spec)
         ret = language.serve(r, self.wfile, self.settings, self.host)
         self.wfile.flush()
-        return http.read_response(self.rfile, r.method, None)
+        return PathocResult._make(http.read_response(self.rfile, r.method, None))
 
-    def _show_summary(self, fp, httpversion, code, msg, headers, content):
-        print >> fp, "<< %s %s: %s bytes"%(code, utils.xrepr(msg), len(content))
+    def _show_summary(self, fp, pathoc_result):
+        print >> fp, "<< %s %s: %s bytes"%(pathoc_result.code, utils.xrepr(pathoc_result.msg), len(pathoc_result.content))
 
     def _show(self, fp, header, data, hexdump):
         if hexdump:
@@ -129,7 +133,7 @@ class Pathoc(tcp.TCPClient):
             print >> fp, "<<", "Disconnect"
 
         if req:
-            if ignorecodes and resp and resp[1] in ignorecodes:
+            if ignorecodes and resp and resp.code in ignorecodes:
                 return
             if explain:
                 print >> fp, ">> Spec:", r.spec()
@@ -141,7 +145,7 @@ class Pathoc(tcp.TCPClient):
                 self._show(fp, "<< Response", self.rfile.get_log(), hexdump)
             else:
                 if resp:
-                    self._show_summary(fp, *resp)
+                    self._show_summary(fp, resp)
             return True
 
 
@@ -201,7 +205,7 @@ class Pathoc(tcp.TCPClient):
                 print >> fp, "<<", "Disconnect"
 
             if req:
-                if ignorecodes and resp and resp[1] in ignorecodes:
+                if ignorecodes and resp and resp.code in ignorecodes:
                     continue
                 if explain:
                     print >> fp, ">> Spec:", r.spec()
@@ -213,7 +217,7 @@ class Pathoc(tcp.TCPClient):
                     self._show(fp, "<< Response", self.rfile.get_log(), hexdump)
                 else:
                     if resp:
-                        self._show_summary(fp, *resp)
+                        self._show_summary(fp, resp)
 
         return True
 
