@@ -122,7 +122,7 @@ class Pathoc(tcp.TCPClient):
         try:
             req = language.serve(r, self.wfile, self.settings, self.host)
             self.wfile.flush()
-            resp = http.read_response(self.rfile, r.method, None)
+            resp = PathocResult._make(http.read_response(self.rfile, r.method, None))
         except http.HttpError, v:
             print >> fp, "<< HTTP Error:", v.msg
         except tcp.NetLibTimeout:
