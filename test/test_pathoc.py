@@ -41,8 +41,8 @@ class TestDaemonSSL(_TestDaemon):
         )
         c.connect()
         c.request("get:/p/200")
-        _, _, _, _, content = c.request("get:/api/log")
-        d = json.loads(content)
+        resp = c.request("get:/api/log")
+        d = json.loads(resp.content)
         assert d["log"][0]["request"]["sni"] == "foobar.com"
 
     def test_clientcert(self):
